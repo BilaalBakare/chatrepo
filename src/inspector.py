@@ -1,9 +1,16 @@
 import subprocess
 from urllib.parse import urlparse
 
-def inspect_repo(link):
-    if not verify_link:
+def inspect_repo(given_link):
+    if not verify_link(given_link):
         raise ValueError("Invalid link")
+
+    target_dir = f"../repo_sandbox/{get_repo_name(given_link)}"
+    
+    subprocess.run(
+        ["git", "clone", "--depth", "1", given_link, target_dir],
+        check=True
+    )
 
     pass
 
