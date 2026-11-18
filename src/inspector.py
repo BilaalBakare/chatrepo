@@ -55,11 +55,11 @@ def inspect_repo(given_link):
     recent_commits = get_commits(target_dir)
     readme = read_readme(target_dir)
     manifests = {p: (target_dir / p).read_text(errors="ignore")[:4000] for p in MANIFEST_NAMES if p in tree}
-    outline = build_outline(target_dir)
+    dependencies = get_dependencies(manifests)
+    outlines = build_outline(target_dir)
     
-    report = RepoReport(owner='')
+    return RepoReport(owner=owner, name=name, head_sha=sha, tree=tree, edges=edges, recent_commits=recent_commits, readme=readme, manifests=manifests, dependencies=dependencies, outlines=outlines)
 
-    pass
 
 
 def verify_link(link):
@@ -75,8 +75,6 @@ def get_repo_name(url):
     path = urlparse(clean_url).path
     return path.strip("/").split("/")[-1]
 
-
-
 def build_tree(root: Path) -> dict[str, int]:
     tree = {}
     for dirpath, dirnames, filenames in os.walk(root):
@@ -89,7 +87,6 @@ def build_tree(root: Path) -> dict[str, int]:
             if size <= MAX_FILE_BYTES:
                 tree[p.relative_to(root).as_posix()] = size
     return tree
-
 
 def imports_of(source: str) -> list[tuple[int, str | None, str]]:
     found = []
