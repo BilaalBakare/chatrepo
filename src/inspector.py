@@ -5,7 +5,9 @@ from urllib.parse import urlparse
 from models import RepoReport
 from pathlib import Path
 
-
+MANIFEST_NAMES = ["pyproject.toml", "requirements.txt", "setup.py", "setup.cfg",
+                  "package.json", "Dockerfile", "docker-compose.yml", "Makefile",
+                  "Cargo.toml", "go.mod"]
 
 
 
@@ -22,7 +24,8 @@ def inspect_repo(given_link):
 
     owner, name = get_repo_name(given_link)
     sha = subprocess.run(["git", "-C", str(target_dir), "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip() 
-
+    manifests = {p: (root / p).read_text(errors="ignore")[:4000] for p in MANIFEST_NAMES if p in tree}
+    
     report = RepoReport(owner='')
 
     pass
