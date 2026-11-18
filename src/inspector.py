@@ -1,5 +1,6 @@
 import subprocess
 import os
+import ast
 from urllib.parse import urlparse
 from models import RepoReport
 from pathlib import Path
@@ -54,3 +55,13 @@ def build_tree(root: Path) -> dict[str, int]:
             if size <= MAX_FILE_BYTES:
                 tree[p.relative_to(root).as_posix()] = size
     return tree
+
+
+def imports_of(source: str) -> list[tuple[int, str | None, str]]:
+    found = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            found += [(0, None, a.name) for a in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            found.append((node.level, node.module, ""))     # level > 0 means a relative import
+    return found
