@@ -85,3 +85,12 @@ def read_readme(root: Path, limit: int = 8000) -> str | None:
         if p.is_file() and p.name.lower().startswith("readme"):
             return p.read_text(errors="ignore")[:limit]
     return None
+
+def outline(source: str) -> str:
+    out = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            kind = "class" if isinstance(node, ast.ClassDef) else "def"
+            doc = (ast.get_docstring(node) or "").split("\n")[0]
+            out.append(f"{kind} {node.name}  (line {node.lineno})  {doc}")
+    return "\n".join(out)
