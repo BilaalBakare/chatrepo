@@ -65,3 +65,14 @@ def imports_of(source: str) -> list[tuple[int, str | None, str]]:
         elif isinstance(node, ast.ImportFrom):
             found.append((node.level, node.module, ""))     # level > 0 means a relative import
     return found
+
+def get_commits(repo_dir):
+    out = subprocess.run(
+        ["git", "-C", str(repo_dir), "log", "-n", "30", "--format=%H%x1f%aI%x1f%s"],
+        capture_output=True, text=True, check=True).stdout
+    commits = []
+    for line in out.splitlines():
+        sha, date, msg = line.split("\x1f")
+        commits.append({"sha": sha, "date": date, "message": msg})
+
+    return commits
