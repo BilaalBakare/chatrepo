@@ -8,7 +8,26 @@ from pathlib import Path
 MANIFEST_NAMES = ["pyproject.toml", "requirements.txt", "setup.py", "setup.cfg",
                   "package.json", "Dockerfile", "docker-compose.yml", "Makefile",
                   "Cargo.toml", "go.mod"]
+SKIP_DIRS = {
+    ".git", ".hg", ".svn",
+    "node_modules", "vendor", "bower_components",
+    ".venv", "venv", "env", "__pycache__", ".mypy_cache", ".pytest_cache", ".tox",
+    "dist", "build", "target", ".next", ".nuxt", ".gradle", ".idea", ".vscode",
+    "site-packages", "coverage", "htmlcov",
+}
 
+# a tuple, because str.endswith() accepts a tuple but not a set
+SKIP_SUFFIXES = (
+    ".lock", "package-lock.json",
+    ".min.js", ".min.css", ".map",
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp",
+    ".pdf", ".zip", ".tar", ".gz", ".whl",
+    ".woff", ".woff2", ".ttf", ".eot",
+    ".mp3", ".mp4", ".mov",
+    ".pyc", ".so", ".dll", ".exe", ".bin", ".class", ".jar",
+)
+
+MAX_FILE_BYTES = 200_000   # about 200 KB; larger files are usually generated or data
 
 
 def inspect_repo(given_link):
