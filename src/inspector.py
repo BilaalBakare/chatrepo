@@ -1,6 +1,10 @@
 import subprocess
 import os
 import ast
+import json
+import re
+import tomllib
+from pathlib import PurePosixPath
 from urllib.parse import urlparse
 from models import RepoReport
 from pathlib import Path
@@ -28,6 +32,8 @@ SKIP_SUFFIXES = (
 )
 
 MAX_FILE_BYTES = 200_000   # about 200 KB; larger files are usually generated or data
+SPEC = re.compile(r"([A-Za-z0-9_.-]+)(?:\[[^\]]*\])?\s*(.*)")   # name, optional extras, rest
+
 
 
 def inspect_repo(given_link):
@@ -41,9 +47,15 @@ def inspect_repo(given_link):
         check=True
     )
 
-    owner, name = get_repo_name(given_link)
+    owner = get_repo_name(given_link)
+    name = get_repo_name(given_link)
     sha = subprocess.run(["git", "-C", str(target_dir), "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip() 
-    manifests = {p: (root / p).read_text(errors="ignore")[:4000] for p in MANIFEST_NAMES if p in tree}
+    tree = build_tree(target_dir)
+    edges = imports_of(target_dir)
+    recent_commits = get_commits(target_dir)
+    readme = read_readme(target_dir)
+    manifests = {p: (target_dir / p).read_text(errors="ignore")[:4000] for p in MANIFEST_NAMES if p in tree}
+    outline = build_outline(target_dir)
     
     report = RepoReport(owner='')
 
@@ -52,7 +64,7 @@ def inspect_repo(given_link):
 
 def verify_link(link):
     result = subprocess.run(
-        ["git", "ls-remote", "--exit-code", "-h", url],
+        ["git", "ls-remote", "--exit-code", "-h", link],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -105,7 +117,7 @@ def read_readme(root: Path, limit: int = 8000) -> str | None:
             return p.read_text(errors="ignore")[:limit]
     return None
 
-def outline(source: str) -> str:
+def build_outline(source: str) -> str:
     out = []
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
@@ -113,3 +125,36 @@ def outline(source: str) -> str:
             doc = (ast.get_docstring(node) or "").split("\n")[0]
             out.append(f"{kind} {node.name}  (line {node.lineno})  {doc}")
     return "\n".join(out)
+
+def get_dependencies(manifests: dict[str, str]) -> dict[str, str | None]:
+    """Parse package names and version specs from requirements.txt, pyproject.toml, package.json."""
+    deps: dict[str, str | None] = {}
+
+    def add(spec: str) -> None:
+        spec = spec.split("#")[0].split(";")[0].strip()          # drop comments and env markers
+        if spec and not spec.startswith(("-", "git+", "http")):
+            m = SPEC.match(spec)
+            if m:
+                deps[m[1].lower()] = m[2].strip() or None
+
+    for path, text in manifests.items():
+        try:
+            match PurePosixPath(path).name:
+                case "requirements.txt":
+                    for line in text.splitlines():
+                        add(line)
+                case "pyproject.toml":
+                    data = tomllib.loads(text)
+                    for spec in data.get("project", {}).get("dependencies", []):
+                        add(spec)
+                    poetry = data.get("tool", {}).get("poetry", {}).get("dependencies", {})
+                    for name, v in poetry.items():
+                        if name.lower() != "python":
+                            deps[name.lower()] = v if isinstance(v, str) else (v.get("version") if isinstance(v, dict) else None)
+                case "package.json":
+                    data = json.loads(text)
+                    for section in ("dependencies", "devDependencies"):
+                        deps.update(data.get(section, {}))
+        except ValueError:                                        # TOML and JSON decode errors both subclass it
+            continue                                              # malformed manifest: skip it
+    return deps
