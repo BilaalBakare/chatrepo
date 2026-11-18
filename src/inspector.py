@@ -76,3 +76,9 @@ def get_commits(repo_dir):
         commits.append({"sha": sha, "date": date, "message": msg})
 
     return commits
+
+def read_readme(root: Path, limit: int = 8000) -> str | None:
+    for p in sorted(root.iterdir()):
+        if p.is_file() and p.name.lower().startswith("readme"):
+            return p.read_text(errors="ignore")[:limit]
+    return None
