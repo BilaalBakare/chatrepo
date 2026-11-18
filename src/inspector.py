@@ -1,5 +1,12 @@
 import subprocess
+import os
 from urllib.parse import urlparse
+from models import RepoReport
+from pathlib import Path
+
+
+
+
 
 def inspect_repo(given_link):
     if not verify_link(given_link):
@@ -11,6 +18,11 @@ def inspect_repo(given_link):
         ["git", "clone", "--depth", "1", given_link, target_dir],
         check=True
     )
+
+    owner, name = get_repo_name(given_link)
+    sha = subprocess.run(["git", "-C", str(target_dir), "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip() 
+
+    report = RepoReport(owner='')
 
     pass
 
@@ -27,3 +39,18 @@ def get_repo_name(url):
     clean_url = url.rstrip("/").removesuffix(".git")
     path = urlparse(clean_url).path
     return path.strip("/").split("/")[-1]
+
+
+
+def build_tree(root: Path) -> dict[str, int]:
+    tree = {}
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]   # edit in place to prune
+        for f in filenames:
+            p = Path(dirpath) / f
+            if p.is_symlink() or p.suffix in SKIP_SUFFIXES:
+                continue
+            size = p.stat().st_size
+            if size <= MAX_FILE_BYTES:
+                tree[p.relative_to(root).as_posix()] = size
+    return tree
